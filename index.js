@@ -2,28 +2,42 @@ var express = require("express");
 var app = express();
 const PORT = 3000;
 var lightStatus = "sensor";
-var luminositySensor = "on";
 var luminosityLevel = 0;
 var threshold = 0;
-var init = true;
 var https = require("https");
 var http = require("http");
 var fs = require("fs");
 var CronJob = require("cron").CronJob;
 var scheduledJobFrom = "";
 var scheduledJobTo = "";
-var scheduleStatus = "off";
+var scheduleStatus = false;
 var isLightOn = false;
 let config;
-// var options = {
-//   key: fs.readFileSync(__dirname + "/certs/privkey.pem"),
-//   cert: fs.readFileSync(__dirname + "/certs/fullchain.pem"),
-// };
+var options = {
+  key: fs.readFileSync(__dirname + "/certs/privkey.pem"),
+  cert: fs.readFileSync(__dirname + "/certs/fullchain.pem"),
+};
 
-const initConfig = () => {
-  const jsonString = fs.readFileSync(__dirname + "/config.json");
+  
+
+const startLight = () => {
+  var five = require("johnny-five"),
+    board = new five.Board();
+
+  board.on("ready", function () {
+
+    // Initialization
+    const relay = new five.Relay(2);
+    let lightSensor = new five.Sensor({
+      pin: "A0",
+      freq: 3000,
+      threshold: 5,
+    });
+    const jsonString = fs.readFileSync(__dirname + "/config.json");
   config = JSON.parse(jsonString);
   lightStatus = config.lightStatus;
+  threshold = config.threshold;
+  scheduleStatus = config.schedule.status;
   var dividedMinutesAndHours = config.schedule.from.split(":");
   scheduledJobFrom = new CronJob(
     dividedMinutesAndHours[1] + " " + dividedMinutesAndHours[0] + " * * *",
@@ -34,7 +48,7 @@ const initConfig = () => {
       console.log("ranFrom");
     },
     null,
-    false,
+    scheduleStatus,
     "Europe/Copenhagen"
   );
   console.log(dividedMinutesAndHours);
@@ -51,40 +65,19 @@ const initConfig = () => {
       console.log("ran");
     },
     null,
-    false,
+    scheduleStatus,
     "Europe/Copenhagen"
   );
   console.log(dividedMinutesAndHours);
-  threshold = config.threshold;
-  scheduleStatus = config.schedule.status;
-  if (scheduleStatus) {
-    scheduledJobFrom.start();
-    scheduledJobTo.start();
-  }
+ 
+  
   console.log(
     `Threshold is ${threshold}, Light is ${lightStatus}, Schedule is from ${config.schedule.from} to ${config.schedule.to}, Schedule status is ${config.schedule.status}`
   );
-};
 
-const startLight = () => {
-  var five = require("johnny-five"),
-    board = new five.Board();
-
-  board.on("ready", function () {
-    const relay = new five.Relay(2);
-
-    let lightSensor = new five.Sensor({
-      pin: "A0",
-      freq: 3000,
-      threshold: 5,
-    });
+    //Logic start
     lightSensor.on("change", function () {
       luminosityLevel = this.scaleTo(0, 100);
-
-      if (init) {
-        threshold = luminosityLevel;
-        init = false;
-      }
       if (
         lightStatus === "on" ||
         (lightStatus === "sensor" && luminosityLevel <= threshold)
@@ -104,7 +97,7 @@ const startLight = () => {
         } Threshold is now: ${threshold}, Luminosity level is now ${luminosityLevel}`
       );
     });
-    // Create an Led on pin 13
+
     this.repl.inject({
       relay: relay,
     });
@@ -190,7 +183,7 @@ const startLight = () => {
 
     app.get("/threshold", (req, res) => {
       threshold = parseInt(luminosityLevel);
-      config.schedule.threshold = parseInt(luminosityLevel);
+      config.threshold = parseInt(luminosityLevel);
       fs.writeFileSync("./config.json", JSON.stringify(config, null, 2));
 
       relay.on();
@@ -218,7 +211,7 @@ const startLight = () => {
           console.log("ranFrom");
         },
         null,
-        true,
+        scheduleStatus,
         "Europe/Copenhagen"
       );
       console.log(dividedMinutesAndHours);
@@ -235,27 +228,32 @@ const startLight = () => {
           console.log("ran");
         },
         null,
-        true,
+        scheduleStatus,
         "Europe/Copenhagen"
       );
       console.log(dividedMinutesAndHours);
-
+      config.schedule.from = offFrom;
+      config.schedule.to = offTo;
+      fs.writeFileSync(__dirname + '/config.json', JSON.stringify(config, null, 2 ));
       res.send({
         message: `Schedule set to switch off light from ${offFrom} to ${offTo}`,
       });
     });
 
     app.get("/scheduleStatus/:mode", (req, res) => {
-      scheduleStatus = req.params.mode;
-      config.schedule.status = req.params.mode;
-      if (scheduleStatus === "on") {
+      scheduleStatus = req.params.mode === 'true' ? true : false;
+      config.schedule.status = req.params.mode === 'true' ? true : false;
+      if (scheduleStatus === true) {
         scheduledJobFrom.start();
         scheduledJobTo.start();
-      } else if (scheduleStatus === "off") {
+      } else if (scheduleStatus === false) {
         scheduledJobFrom.stop();
         scheduledJobTo.stop();
       }
       fs.writeFileSync("./config.json", JSON.stringify(config, null, 2));
+      res.send({
+        message: 'Schedule set to ' + scheduleStatus
+      })
     });
 
     var httpserver = http.createServer(options, app);
@@ -268,5 +266,4 @@ const startLight = () => {
   });
 };
 
-initConfig();
 startLight();

@@ -1,9 +1,9 @@
 {
-  "threshold": 0,
+  "threshold": 18,
   "schedule": {
-    "from": "22:05",
-    "to": "22:06",
-    "status": true
+    "from": "03:11",
+    "to": "03:12",
+    "status": false
   },
-  "lightStatus": "off"
+  "lightStatus": "sensor"
 }

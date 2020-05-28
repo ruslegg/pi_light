@@ -13,7 +13,7 @@ var scheduledJobTo = "";
 var scheduleStatus = false;
 var isLightOn = false;
 let config;
-var options = {
+var certificates = {
   key: fs.readFileSync(__dirname + "/certs/privkey.pem"),
   cert: fs.readFileSync(__dirname + "/certs/fullchain.pem"),
 };
@@ -256,8 +256,8 @@ const startLight = () => {
       })
     });
 
-    var httpserver = http.createServer(options, app);
-    var httpsserver = https.createServer(options, app);
+    var httpserver = http.createServer(certificates, app);
+    var httpsserver = https.createServer(certificates, app);
     httpserver.listen(80, () => console.log("http server on"));
     httpsserver.listen(443, () => {});
     console.log(

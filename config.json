@@ -1,0 +1,9 @@
+{
+  "threshold": 0,
+  "schedule": {
+    "from": "22:05",
+    "to": "22:06",
+    "status": true
+  },
+  "lightStatus": "off"
+}
